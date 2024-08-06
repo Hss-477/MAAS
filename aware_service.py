@@ -28,11 +28,11 @@ from sklearn.svm import SVR
 from sklearn.neighbors import KNeighborsRegressor
 
 
-# 参数1\2\3  新鲜度特征，三个级别，【[db], [tab], [attr], [all]】   _t/_n/_tm 度量方式Time和Num   还有一个扩展的attrextend
-# 参数2  额外特征，动态和静态，【[dynamic], [static]】
-# 参数3,4  样本数据所在路径、列名
-# 暂时没写指定级别和额外特征的构建方式。
-# 目前可能组合都构建：
+# 参数1\2\3  新鲜度特征，三个级别：
+#【[db], [tab], [attr], [all]】   _t/_n/_tm 度量方式Time和Num   还有一个扩展的attrextend
+# 参数4  候选特征  
+# 参数5  样本数据
+# 暂时没写指定级别和额外特征的构建方式，目前可能组合都构建：
 class AccuAwareService:
     def __init__(self, feature_vgap_tn, feature_vgap_t, feature_vgap_n, feature_add, sample_data):
         # 仅新鲜度特征，对应需要的的数据列名
@@ -218,7 +218,6 @@ class AccuAwareService:
                 else:
                     full_gap.append(nowvgap[rule[r]])
                 r += 1
-
         return full_gap
 
     # 仅新鲜度特征构造的模型
@@ -394,7 +393,6 @@ class AccuAwareService:
     # 在新鲜度特征的基础上增加特
     # 模型有5个：aware_db_addk、aware_tab_addk、aware_attr_addk、aware_attrextend_addk、aware_all_addk
     # 确定添加个数 k，逐一与新鲜度结合，获得度量指标
-    # 先静态特征，只要提升的都加入，超过个数就排队，不足用动态补
     # 参数measure，在增加额外特征的时候不需要所有度量级别的基础上进行，可指定 t、n、tn
     ########  注意，保存到文件的数据，新鲜度相关只保留了度量级别和方法，没有具体到版本属性名
     def build_model_vgap_add(self, addtopk, measure):
@@ -432,41 +430,11 @@ class AccuAwareService:
             # 候选特征的排序，先按个数，再按主备
             oprelable = 'addfeat'
             for feature_i in range(len(self.af)):
-                candidate_features = self.af[feature_i]
-
-                # if feature_i == 0:
-                #     candidate_features = self.af[0]
-                #     oprename = '自带'
-                #     oprelable = 'f_user'
-                # elif feature_i == 1:
-                #     candidate_features = self.af[1]
-                #     oprename = '一条到备'
-                #     oprelable = 'af_1s'
-                # elif feature_i == 2:
-                #     candidate_features = self.af[2]
-                #     oprename = '一条到主'
-                #     oprelable = 'af_1p'
-                # elif feature_i == 3:
-                #     candidate_features = self.af[3]
-                #     oprename = '两条到备'
-                #     oprelable = 'af_2s'
-                # elif feature_i == 4:
-                #     candidate_features = self.af[4]
-                #     oprename = '二条到主'
-                #     oprelable = 'af_2p'
-                # elif feature_i == 5:
-                #     candidate_features = self.af[5]
-                #     oprename = '十一条到备'
-                #     oprelable = 'af_11s'
-                # else:
-                #     candidate_features = self.af[6]
-                #     oprename = '十一条到主'
-                #     oprelable = 'af_11p'
-
+                candidate_features = self.af[feature_i]            
                 self.eval_result = list()  # 清空，保存运行数据。   moedlname / 加入特征名 / 三个评估结果 / 算法
                 temp_inc_eval = list()  # 借用这个变量将所有加一个特征后的结果提升的放入，选择topk。   加入特征名 / 三个评估结果
                 for fi in candidate_features:
-                    # 特征名虚幻转换和提取
+                    # 特征名转换和提取
                     replaced_colname = self.replace_cloname(fi)
                     allfeat = base_level[leveli] + replaced_colname
                     x_train, x_test, y_train, y_test = self.get_train_data(allfeat)
@@ -505,78 +473,7 @@ class AccuAwareService:
                 if need_f == 0:
                     break
 
-            # for sf in self.stat:
-            #     # 注意如果是now_timne和start_time则需要使用在预处理中变换后的列名
-            #     replaced_colname = self.replace_cloname(sf)
-            #     allfeat = base_level[leveli] + replaced_colname
-            #     x_train, x_test, y_train, y_test = self.get_train_data(allfeat)
-            #     aware_m, eval_r = self.choose_model(x_train, x_test, y_train, y_test)
-            #     modelinfo = ['sf', sf] + eval_r  # 尝试加入一个特征的模型结果记录
-            #     self.eval_result.append(modelinfo)
-            #     # 筛选指标提升的---三个指标只要有一个提升的   返回的eval_r时['模型名称计入属性''RMSE', 'MAE', 'R2', '线性']
-            #     # 注意前两个评估值是越小越好，最后一个越大越好。依次判断，只要有提升就记录这个属性
-            #     if eval_r[1] < base_eval[leveli][0]:
-            #         temp_inc_eval.append(modelinfo)
-            #     elif eval_r[2] < base_eval[leveli][1]:
-            #         temp_inc_eval.append(modelinfo)
-            #     elif eval_r[3] > base_eval[leveli][2]:
-            #         temp_inc_eval.append(modelinfo)
-            # # 把所有静态尝试加入得到的评估结果记录下来
-            # with open('/root/dataset_accu/collect/eval_result.csv', 'a+') as file:
-            #     writer = csv.writer(file)
-            #     self.eval_result.sort(key=lambda x: x[3])  # 以MAE结果排序，最优在前，默认升序
-            #     writer.writerows(self.eval_result)
-            # print("每次加一个静态特征（备库）的结果")
-            # for i in self.eval_result:
-            #     print(i)
-            # print("*****")
-            #
-            # # 增加性能的静态特征个数是否够addtopk
-            # get_add_feature = list()
-            # temp_inc_eval.sort(key=lambda x: x[3])   # 上面排序的是针对有的静态特征，为了记录过程。这只需要对提升指标的进行筛选
-            # static_len = len(temp_inc_eval)
-            # if static_len >= addtopk:  # 静态满足需要个数
-            #     get_add_feature.extend(temp_inc_eval[: addtopk])
-            # else:  # 数量不够考虑加入静态主库
-            #     get_add_feature.extend(temp_inc_eval)
-            #
-            #     self.eval_result = list()
-            #     temp_inc_eval = list()
-            #     for df in self.dyn:
-            #         # 注意这里的动态特征有：['status1_p', 'status1_s', 'status2_p', 'status2_s', 'status3_p', 'status3_s']
-            #         # 其中一二是list，已经在预处理中拆分开，三是一个值直接使用
-            #         replaced_colname = self.replace_cloname(df)
-            #         allfeat = base_level[leveli] + replaced_colname
-            #         x_train, x_test, y_train, y_test = self.get_train_data(allfeat)
-            #         aware_m, eval_r = self.choose_model(x_train, x_test, y_train, y_test)
-            #         modelinfo = ['df', df] + eval_r
-            #         self.eval_result.append(modelinfo)
-            #         # 筛选指标提升的---三个指标只要有一个提升的   返回的eval_r时['RMSE', 'MAE', 'R2', '线性']
-            #         if eval_r[1] < base_eval[leveli][0]:
-            #             temp_inc_eval.append(modelinfo)
-            #         elif eval_r[2] < base_eval[leveli][1]:
-            #             temp_inc_eval.append(modelinfo)
-            #         elif eval_r[3] > base_eval[leveli][2]:
-            #             temp_inc_eval.append(modelinfo)
-            #     # 把所有静态尝试加入得到的评估结果记录下来
-            #     with open('/root/dataset_accu/collect/eval_result.csv', 'a+') as file:
-            #         writer = csv.writer(file)
-            #         self.eval_result.sort(key=lambda x: x[3])
-            #         writer.writerows(self.eval_result)
-            #     print("每次加一个动态特征的结果")
-            #     for i in self.eval_result:
-            #         print(i)
-            #     print("*****")
-            #
-            #     # 剩余需要加入的特征数量，超过就把能加的加入
-            #     need_f = addtopk - static_len
-            #     temp_inc_eval.sort(key=lambda x: x[3])
-            #     if need_f < len(temp_inc_eval):
-            #         get_add_feature.extend(temp_inc_eval[: need_f])
-            #     else:
-            #         get_add_feature.extend(temp_inc_eval)
-
-            # 现已完成所有特征的选取，开始训练选好的模型了
+            # 现已完成所有特征的选取，开始训练选好的模型
             colname_all = list()
             for r in get_add_feature:   # get_add_feature的元素项为： sf/df，name。'RMSE', 'MAE', 'R2', 模型
                 colname_all.append(r[1])
@@ -1072,8 +969,7 @@ class AccuAwareService:
         # 此指定的感知模型awareName，所需要的特征项名
         filtered_df = self.awaremode_And_features[self.awaremode_And_features['modelname'] == awareName]
         needfeat_all = filtered_df.iloc[0]['features']
-
-        # 这里对应用户模型需要的，停车数、状态1、2、3的路由方向。分别包含的sql语句数是1、3、3、3
+        
         nowRouting = [0, 0, 0, 0]
         # 全部路由到备库时的可能损失.
         nowLoss, origvgap = self.predict(awareName, needfeat_all,
@@ -1081,7 +977,7 @@ class AccuAwareService:
 
         # 路由决策
         if nowLoss < 1.0:
-            nowLoss = 0.0    # 预测出来的可容忍损失loss是小于1的（也就是60以下），那就当做是没有损失
+            nowLoss = 0.0    # 预测出来的可容忍损失loss是小于1的（也就是60s以下），那就当做是没有损失
         beginLoss = nowLoss  # 创建这个变量是为了在uni_diff实验中，返回最开始的可能loss来判断uni方法。不然的话这里最后返回的newLoss是diff方法路径变化后的
         if nowLoss <= tolerable_loss:  # 满足需求则全部直接路由到备份
             newLoss = nowLoss
@@ -1116,7 +1012,7 @@ class AccuAwareService:
 
 
 
-# 一下过程有些比较慢，直接一次写入，然后存回文件
+# 以下过程比较慢，直接一次写入，然后存回文件
 # 对warehouse_name进行编码，对时间进行提取，attr扩展转换，动态特征分开。
 # 对所有列进行归一化（除warehouse_name、recordid、user_code、
 def data_preprocessing():
@@ -1305,8 +1201,8 @@ if __name__ == "__main__":
     # data_preprocessing()
     # print("数据预处理完成")
 
-    # 对特征获取所需平均sql数计算     !!!!!!
-    # feature_neednum()   #这里的结果手动写到 parameter.py里的feature_add
+    # 对特征获取所需平均sql数计算 （只有考虑请求参数，这里可以运行）
+    # feature_neednum()   #这里的结果需要对应到 parameter.py里的feature_add
 
     # 构建 仅新鲜度的模型 和 k11 模型
     # sample_data = pd.read_csv('/root/dataset_accu/collect/new_sample_data.csv')   # 这个预处理后的文件有列名，就是上面对应的
