@@ -4,10 +4,6 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 
-
-#注意，这里都是执行完后都是基础数据的提取，还需要进一步手动修正更快
-
-
 # 仓库表
 # warehouseid、warehouse_name、park_count
 import pymysql
@@ -204,7 +200,6 @@ def queuingdata_to_mysql():
             sql = "INSERT INTO queuing_info VALUES (%s, %s, %s, %s, %s, %s, %s, %s);"
             values = (row.recordid, row.user_code, row.cargo_name, row.warehouse_name,
                       row.start_time, row.entry_time, row.entry_whouse_time, row.finish_time)
-            # NaN不能直接当做参数值用到sql中，需要转为NULL
             new_vaules = tuple(None if x != x else x for x in values)
             cursor.execute(sql, new_vaules)
 
