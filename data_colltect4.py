@@ -41,15 +41,14 @@ def nextday_insert_startdata(update_time):
 
 
 # 在每次主备之间有状态差异的时候收集数据
-# 这你不需要传入参数，只要吧一直使用的主备在这里进行全局变量使用
 def collect_sample():  # 在main中，主库时间为now_time，备库时间是backup_time
     global now_time, backup_time, user_request_all
     # 1)版本差信息time和num， 依次属性、表、库级别
-    # 2)特征 now_time、start_time、warehouse_name（实际是用它查 park_count）、cargo_name（实际用在动态时获取前车的加载时间）
+    # 2)特征 now_time、start_time、warehouse_name、cargo_name
     # 3)动态特征,过滤得到排在前的车辆的信息，这里只要货物加载时间信息
-    #             status1.队伍前的车辆的加载时间list；   取最近的十值
-    #             status2库外停车的车辆的加载时间list；  最多十值
-    #             status3库内工作车辆的剩余时间      一值
+    #             status1.队伍前的车辆的加载时间list；   厂外前车等待数和等待时间求和
+    #             status2库外停车的车辆的加载时间list；  最多10位
+    #             status3库内工作车辆的剩余时间。      
     vgap_time, vgap_num = get_vgap()
     now_request_trucks = cal_request_trucks()  # 目前在排队的车辆，可以发出预测请求
     # print(f"可发送请求数：{len(now_request_trucks)}，具体信息是：{now_request_trucks}")
@@ -63,8 +62,8 @@ def collect_sample():  # 在main中，主库时间为now_time，备库时间是b
         next_day = now_time + timedelta(days=1)
         now_time = next_day.replace(hour=6, minute=0, second=0)
         # 新一天开始增开始数据。同步到备之后，回到main函数，开始新一天的第一次gap
-        # print("进入下一天 #################")
-        ##### 注意，这里修改修改一下，为了减少0访问的产生，此时跳到第二天，主备状态更新诶这个，下面新加数据是可以访问的
+        # print("进入下一天 *")
+        #注意，这里修改修改一下，为了减少0请求访问的产生，此时跳到第二天，主备状态更新这个，下面新加数据是可以访问的
         update_data('106.75.233.244', now_time)
         backup_time = syn_backup(now_time)
         now_time = nextday_insert_startdata(now_time)   # 新一天开始来车
@@ -72,7 +71,6 @@ def collect_sample():  # 在main中，主库时间为now_time，备库时间是b
         now_request_trucks = cal_request_trucks()
         user_num = len(now_request_trucks)
         print(user_num)
-
 
     for truck in now_request_trucks:
         recordid = truck[0]
@@ -85,7 +83,7 @@ def collect_sample():  # 在main中，主库时间为now_time，备库时间是b
         predict_s, status1_s, status2_s, status3_s, _, exesql_num_s \
             = predict_wait_time([0, 0, 0, 0], now_time, start_time, warehouse_name, 1, 1)
 
-        # 保存执行的特征获取sal数
+        # 保存执行的特征获取sql数
         with open('/root/dataset_accu/collect/expt_sql_num0.csv', 'a+') as sqlnumfile:
             result_sqlnum = [now_time, start_time, exesql_num_p, exesql_num_s]
             writer = csv.writer(sqlnumfile)
@@ -115,11 +113,7 @@ def collect_sample():  # 在main中，主库时间为now_time，备库时间是b
             db.close()
         sample_data.extend(park_count)  # 主、备的查询结果
 
-        # 处理动态特征位数----用list保存.status3直接是一个值。前两个是list，其顺序就是排队的顺序
-        # all_status = [status1_p, status1_s,
-        #               status2_p, status2_s]
-        # 上面注释掉的是之前的，对status1也截断只要10个值，但实际上这个厂外排队车辆数是不确定的。
-        # 所以这个值仍然是list，但只包含两位，  厂外前车等待数和等待时间求和。已经在等待时间预测函数反复之前处理了
+        # 处理动态特征位数----用list保存. status3直接是一个值。前两个是list，其顺序就是排队的顺序
         sample_data.append(status1_p)
         sample_data.append(status1_s)
         all_status = [status2_p, status2_s]
